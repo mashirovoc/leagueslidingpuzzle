@@ -249,7 +249,7 @@ const App = () => {
         <div className="flex flex-col md:flex-row justify-between items-center pb-6">
           <div className="space-y-1 text-center md:text-left">
             <h1 className="text-3xl font-bold tracking-tight">
-              LoL スライディングパズル
+              League Sliding Puzzle
             </h1>
             <p className="text-muted-foreground">
               お気に入りのチャンピオンで遊んでみよう！
