@@ -336,6 +336,9 @@ const App = () => {
                     <RefreshCw className="mr-2 h-4 w-4" /> リセット
                   </Button>
                 </div>
+                <div>
+                  <img src={getImageUrl()} className="rounded-lg" />
+                </div>
               </CardContent>
               <CardFooter className="justify-center text-center bg-muted/20 pt-4">
                 <div>
