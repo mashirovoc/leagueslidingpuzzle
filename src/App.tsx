@@ -34,8 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch"; // Switchコンポーネントを追加
-
+import { Switch } from "@/components/ui/switch";
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
 type Champion = {
@@ -73,10 +72,8 @@ const App = () => {
   const [moves, setMoves] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // お手本表示の切り替えステート (デフォルトON)
   const [showExample, setShowExample] = useState(true);
 
-  // クリア時のモーダル表示制御用
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const resetGame = useCallback(() => {
