@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import {
+  Eye, // アイコン追加
   Image as ImageIcon,
   Loader2,
   RefreshCw,
@@ -19,6 +20,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"; // Dialogコンポーネントを追加
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -66,6 +74,9 @@ const App = () => {
   const [moves, setMoves] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // クリア時のモーダル表示制御用
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+
   const resetGame = useCallback(() => {
     const totalTiles = gridSize * gridSize;
     const initialTiles = Array.from({ length: totalTiles }, (_, i) => i);
@@ -73,6 +84,7 @@ const App = () => {
     setIsSolved(true);
     setIsPlaying(false);
     setMoves(0);
+    setShowSuccessDialog(false);
   }, [gridSize]);
 
   useEffect(() => {
@@ -173,6 +185,7 @@ const App = () => {
     setIsPlaying(true);
     setIsSolved(false);
     setMoves(0);
+    setShowSuccessDialog(false);
   };
 
   const checkWin = (currentTiles: number[]) => {
@@ -180,10 +193,12 @@ const App = () => {
     if (isWin) {
       setIsSolved(true);
       setIsPlaying(false);
+      setShowSuccessDialog(true); // 勝利ダイアログを表示
       confetti({
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
+        zIndex: 2000, // ダイアログより手前に出るように
       });
     }
   };
@@ -336,9 +351,6 @@ const App = () => {
                     <RefreshCw className="mr-2 h-4 w-4" /> リセット
                   </Button>
                 </div>
-                <div>
-                  <img src={getImageUrl()} className="rounded-lg" />
-                </div>
               </CardContent>
               <CardFooter className="justify-center text-center bg-muted/20 pt-4">
                 <div>
@@ -356,7 +368,7 @@ const App = () => {
           </div>
 
           <div className="lg:col-span-8 flex flex-col items-center justify-start pt-2">
-            <div className="w-full max-w-[800px] rounded-lg overflow-hidden border bg-card">
+            <div className="w-full max-w-[800px] rounded-lg overflow-hidden border bg-card shadow-sm">
               <div className="relative w-full aspect-video bg-muted overflow-hidden">
                 <div className="absolute inset-0 w-full h-full">
                   {tileIds.map((tileValue) => {
@@ -404,54 +416,88 @@ const App = () => {
                     </Button>
                   </div>
                 )}
-
-                {isSolved && moves > 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center z-20 bg-background/60 backdrop-blur-sm animate-in fade-in duration-500">
-                    <Card className="w-[300px] border-primary">
-                      <CardHeader className="text-center pb-2">
-                        <Trophy className="mx-auto h-12 w-12 text-yellow-500 mb-2" />
-                        <CardTitle className="text-2xl text-primary">
-                          クリア！
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="text-center space-y-4">
-                        <p className="text-muted-foreground">
-                          おめでとうございます！
-                        </p>
-                        <div className="flex justify-center gap-4 text-sm font-medium">
-                          <div className="flex flex-col">
-                            <span className="text-muted-foreground">
-                              移動回数
-                            </span>
-                            <span className="text-xl">{moves}</span>
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-muted-foreground">
-                              サイズ
-                            </span>
-                            <span className="text-xl">
-                              {gridSize}x{gridSize}
-                            </span>
-                          </div>
-                        </div>
-                      </CardContent>
-                      <CardFooter>
-                        <Button className="w-full" onClick={shuffleBoard}>
-                          もう一度遊ぶ
-                        </Button>
-                      </CardFooter>
-                    </Card>
-                  </div>
-                )}
               </div>
             </div>
-
+            <div className="w-full max-w-[800px] flex justify-end mt-2">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <Eye className="h-4 w-4" />
+                    お手本を表示
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl p-4 overflow-hidden bg-transparent border-none shadow-none">
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <img
+                      src={getImageUrl()}
+                      alt="Example"
+                      className="rounded-lg shadow-2xl max-h-[80vh] w-auto object-contain"
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
             <p className="text-xs text-muted-foreground mt-4 text-center">
               ※ Data Dragon APIを使用しています。
             </p>
           </div>
         </div>
       </div>
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md text-center">
+          <DialogHeader>
+            <div className="flex justify-center mb-4">
+              <Trophy className="h-16 w-16 text-yellow-500" />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-center">
+              クリア！
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            <p className="text-muted-foreground">
+              おめでとうございます！パズルを完成させました。
+            </p>
+            <div className="flex justify-center gap-8 text-sm font-medium bg-muted/50 p-4 rounded-lg">
+              <div className="flex flex-col">
+                <span className="text-muted-foreground text-xs mb-1">
+                  移動回数
+                </span>
+                <span className="text-2xl font-bold font-mono">{moves}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-muted-foreground text-xs mb-1">
+                  サイズ
+                </span>
+                <span className="text-2xl font-bold font-mono">
+                  {gridSize}x{gridSize}
+                </span>
+              </div>
+            </div>
+            <div className="relative aspect-video w-full rounded-md overflow-hidden border">
+              <img
+                src={getImageUrl()}
+                className="object-cover w-full h-full"
+                alt="Finished Puzzle"
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Button className="w-full sm:w-auto" onClick={shuffleBoard}>
+              もう一度遊ぶ
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setShowSuccessDialog(false)}
+            >
+              閉じる
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
