@@ -581,7 +581,7 @@ const App = () => {
       }
       currentScore = Math.floor(currentScore * multiplier);
       if (hasUsedAssist) {
-        currentScore = Math.floor(currentScore * 0.05);
+        currentScore = Math.floor(currentScore * 0.01);
       }
       return currentScore;
     },
@@ -1059,7 +1059,7 @@ const App = () => {
                     <AccordionContent className="text-destructive">
                       <p>
                         ゲーム中に一度でもアシストモードをONにすると、最終スコアは計算結果の
-                        <span className="font-bold">5%</span>
+                        <span className="font-bold">1%</span>
                         になります。
                       </p>
                     </AccordionContent>
