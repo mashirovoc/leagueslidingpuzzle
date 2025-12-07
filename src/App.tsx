@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import confetti from "canvas-confetti";
 import {
-  Eye, // アイコン追加
   Image as ImageIcon,
   Loader2,
   RefreshCw,
@@ -25,8 +24,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"; // Dialogコンポーネントを追加
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -36,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch"; // Switchコンポーネントを追加
 
 const DDRAGON_BASE = "https://ddragon.leagueoflegends.com";
 
@@ -73,6 +72,9 @@ const App = () => {
   const [isSolved, setIsSolved] = useState(false);
   const [moves, setMoves] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // お手本表示の切り替えステート (デフォルトON)
+  const [showExample, setShowExample] = useState(true);
 
   // クリア時のモーダル表示制御用
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -193,12 +195,12 @@ const App = () => {
     if (isWin) {
       setIsSolved(true);
       setIsPlaying(false);
-      setShowSuccessDialog(true); // 勝利ダイアログを表示
+      setShowSuccessDialog(true);
       confetti({
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
-        zIndex: 2000, // ダイアログより手前に出るように
+        zIndex: 2000,
       });
     }
   };
@@ -261,7 +263,7 @@ const App = () => {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-center pb-6">
+        <div className="flex flex-col md:flex-row justify-between items-center">
           <div className="space-y-1 text-center md:text-left">
             <h1 className="text-3xl font-bold tracking-tight">
               League Sliding Puzzle
@@ -343,7 +345,7 @@ const App = () => {
                   <div className="font-mono text-2xl font-bold">{moves}</div>
                 </div>
 
-                <div className="flex flex-col gap-2 pt-2">
+                <div className="flex flex-col gap-2">
                   <Button size="lg" onClick={shuffleBoard}>
                     <Shuffle className="mr-2 h-4 w-4" /> ゲーム開始 (シャッフル)
                   </Button>
@@ -351,8 +353,29 @@ const App = () => {
                     <RefreshCw className="mr-2 h-4 w-4" /> リセット
                   </Button>
                 </div>
+
+                <Separator />
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="show-example"
+                    checked={showExample}
+                    onCheckedChange={setShowExample}
+                  />
+                  <Label htmlFor="show-example">お手本画像を表示</Label>
+                </div>
+
+                {showExample && (
+                  <div className="animate-in fade-in zoom-in-95 duration-300">
+                    <img
+                      src={getImageUrl()}
+                      className="rounded-lg border w-full"
+                      alt="Example"
+                    />
+                  </div>
+                )}
               </CardContent>
-              <CardFooter className="justify-center text-center bg-muted/20 pt-4">
+              <CardFooter className="justify-center text-center bg-muted/20">
                 <div>
                   <h3 className="font-semibold text-lg">
                     {currentSkinName === "default"
@@ -367,8 +390,8 @@ const App = () => {
             </Card>
           </div>
 
-          <div className="lg:col-span-8 flex flex-col items-center justify-start pt-2">
-            <div className="w-full max-w-[800px] rounded-lg overflow-hidden border bg-card shadow-sm">
+          <div className="lg:col-span-8 flex flex-col items-center justify-start">
+            <div className="w-full max-w-[800px] rounded-lg overflow-hidden border bg-card">
               <div className="relative w-full aspect-video bg-muted overflow-hidden">
                 <div className="absolute inset-0 w-full h-full">
                   {tileIds.map((tileValue) => {
@@ -418,25 +441,7 @@ const App = () => {
                 )}
               </div>
             </div>
-            <div className="w-full max-w-[800px] flex justify-end mt-2">
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-2">
-                    <Eye className="h-4 w-4" />
-                    お手本を表示
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl p-4 overflow-hidden bg-transparent border-none shadow-none">
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <img
-                      src={getImageUrl()}
-                      alt="Example"
-                      className="rounded-lg shadow-2xl max-h-[80vh] w-auto object-contain"
-                    />
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
+
             <p className="text-xs text-muted-foreground mt-4 text-center">
               ※ Data Dragon APIを使用しています。
             </p>
