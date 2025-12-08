@@ -846,7 +846,7 @@ const App = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2 pb-4 border-b">
+                      <div className="space-y-2 pb-4">
                         <Label>勝負形式</Label>
                         {canControlSettings ? (
                           <Select
@@ -1132,7 +1132,7 @@ const App = () => {
                           <div className="flex items-center gap-2">
                             {player.isHost && (
                               <Badge variant="default" className="text-[10px]">
-                                HOST
+                                ホスト
                               </Badge>
                             )}
                             <span className="font-medium truncate max-w-[120px]">
@@ -1147,9 +1147,9 @@ const App = () => {
                           <div>
                             {!player.isHost &&
                               (player.isReady ? (
-                                <Badge className="bg-green-500">READY</Badge>
+                                <Badge className="bg-green-500">Ready</Badge>
                               ) : (
-                                <Badge variant="outline">WAITING</Badge>
+                                <Badge variant="outline">準備中</Badge>
                               ))}
                           </div>
                         </div>
