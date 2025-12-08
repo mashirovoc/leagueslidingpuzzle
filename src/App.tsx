@@ -111,6 +111,8 @@ const App = () => {
   const [showExample, setShowExample] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
+  const hasShownLastOneAlertRef = useRef(false);
+
   const {
     tiles,
     isSolved,
@@ -185,6 +187,7 @@ const App = () => {
       setShowSuccessDialog(false);
       setWinnerId(null);
       setFinishedPlayers([]);
+      hasShownLastOneAlertRef.current = false;
     },
     [resetGame]
   );
@@ -262,6 +265,7 @@ const App = () => {
       socket.on("game_started", (roomData: Room) => {
         setRoom(roomData);
         setAppState("GAME");
+        hasShownLastOneAlertRef.current = false;
         shuffleBoardRef.current(roomData.seed);
       });
 
@@ -440,6 +444,57 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const getImageUrl = useMemo(() => {
+    if (!selectedChampId || !selectedSkinId) return "";
+
+    const skin = skins.find((s) => s.id === selectedSkinId);
+
+    if (!skin || !selectedSkinId.startsWith(selectedChampId)) {
+      return "";
+    }
+
+    return `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
+  }, [selectedChampId, selectedSkinId, skins]);
+
+  const isHost = isMultiplayer
+    ? room?.players[mySocketId || ""]?.isHost ?? false
+    : true;
+  const canControlSettings =
+    !isMultiplayer || (isMultiplayer && isHost && appState === "SETUP");
+  const playerCount = room ? Object.keys(room.players).length : 0;
+  const allGuestsReady = room
+    ? Object.values(room.players)
+        .filter((p) => !p.isHost)
+        .every((p) => p.isReady)
+    : false;
+  const canStartGame =
+    !isMultiplayer || (isMultiplayer && playerCount >= 2 && allGuestsReady);
+  const myPlayer = room?.players[mySocketId || ""];
+  const showControlPanel = !isVoidMode;
+
+  const isTimeAttackLastOne = useMemo(() => {
+    if (!isMultiplayer || !room || multiplayerMode !== "TIME_ATTACK")
+      return false;
+    const finishedCount = Object.values(room.players).filter(
+      (p) => p.finished
+    ).length;
+    return !isSolved && finishedCount === playerCount - 1 && playerCount > 1;
+  }, [isMultiplayer, room, multiplayerMode, isSolved, playerCount]);
+
+  useEffect(() => {
+    if (isTimeAttackLastOne && !hasShownLastOneAlertRef.current) {
+      hasShownLastOneAlertRef.current = true;
+      setAlertState({
+        open: true,
+        title: "残り1人です！",
+        description: "他のプレイヤーは全員ゴールしました。最後まで諦めずに！",
+        actionLabel: "閉じる",
+        onAction: () => setAlertState((prev) => ({ ...prev, open: false })),
+        showCancel: false,
+      });
+    }
+  }, [isTimeAttackLastOne]);
+
   const handleGridSizeChange = useCallback(
     (newSize: number) => {
       setGridSize(newSize);
@@ -481,13 +536,6 @@ const App = () => {
     },
     [resetGame, isMultiplayer, setIsAssistMode]
   );
-
-  const getImageUrl = useMemo(() => {
-    if (!selectedChampId || !selectedSkinId) return "";
-    const skin = skins.find((s) => s.id === selectedSkinId);
-    if (!skin) return "";
-    return `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
-  }, [selectedChampId, selectedSkinId, skins]);
 
   const handleCreateRoom = () => {
     pendingActionRef.current = { type: "create", username: username || "Host" };
@@ -590,31 +638,6 @@ const App = () => {
     multiplayerMode,
     mySocketId,
   ]);
-
-  const isHost = isMultiplayer
-    ? room?.players[mySocketId || ""]?.isHost ?? false
-    : true;
-  const canControlSettings =
-    !isMultiplayer || (isMultiplayer && isHost && appState === "SETUP");
-  const playerCount = room ? Object.keys(room.players).length : 0;
-  const allGuestsReady = room
-    ? Object.values(room.players)
-        .filter((p) => !p.isHost)
-        .every((p) => p.isReady)
-    : false;
-  const canStartGame =
-    !isMultiplayer || (isMultiplayer && playerCount >= 2 && allGuestsReady);
-  const myPlayer = room?.players[mySocketId || ""];
-  const showControlPanel = !isVoidMode;
-
-  const isTimeAttackLastOne = useMemo(() => {
-    if (!isMultiplayer || !room || multiplayerMode !== "TIME_ATTACK")
-      return false;
-    const finishedCount = Object.values(room.players).filter(
-      (p) => p.finished
-    ).length;
-    return !isSolved && finishedCount === playerCount - 1 && playerCount > 1;
-  }, [isMultiplayer, room, multiplayerMode, isSolved, playerCount]);
 
   if (loading) {
     return (
