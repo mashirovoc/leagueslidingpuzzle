@@ -13,9 +13,24 @@ declare module "fastify" {
 
 const fastify = Fastify({ logger: true });
 
-fastify.register(cors, { origin: "*" });
+const allowedOrigins = [
+  process.env.CLIENT_URL || "http://localhost:5173",
+  "http://localhost:3001",
+];
+
+// FastifyのCORS設定
+fastify.register(cors, {
+  origin: allowedOrigins,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+});
+
+// Socket.IOのCORS設定
 fastify.register(fastifySocketIO, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true, // 必要に応じて
+  },
 });
 
 const rooms: { [roomId: string]: Room } = {};
