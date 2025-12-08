@@ -73,7 +73,6 @@ import type {
   Skin,
 } from "@/lib/types";
 
-// Socket接続後のアクション待機用
 type PendingSocketAction =
   | { type: "create"; username: string }
   | { type: "join"; roomId: string; username: string };
@@ -82,7 +81,6 @@ const App = () => {
   const { version, champions, loading } = useLeagueData();
   const initializedRef = useRef(false);
 
-  // --- アプリケーション状態 ---
   const [appState, setAppState] = useState<AppState>("MENU");
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [username, setUsername] = useState("");
@@ -94,7 +92,6 @@ const App = () => {
     description: "",
   });
 
-  // --- Socket.IO 状態 ---
   const socketRef = useRef<Socket | null>(null);
   const [mySocketId, setMySocketId] = useState<string | null>(null);
 
@@ -103,14 +100,11 @@ const App = () => {
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [finishedPlayers, setFinishedPlayers] = useState<Player[]>([]);
 
-  // --- ゲーム設定状態 ---
   const [selectedChampId, setSelectedChampId] = useState<string>("");
   const [skins, setSkins] = useState<Skin[]>([]);
-  // スキンのロード状態を管理（チラつき防止）
   const [isSkinLoading, setIsSkinLoading] = useState(false);
 
   const [selectedSkinId, setSelectedSkinId] = useState<string>("");
-  // 画像URLをState管理（チラつき防止）
   const [currentImageUrl, setCurrentImageUrl] = useState<string>("");
 
   const [gridSize, setGridSize] = useState(3);
@@ -121,10 +115,20 @@ const App = () => {
   const [showExample, setShowExample] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
-  // --- アラート制御用Ref ---
   const hasShownLastOneAlertRef = useRef(false);
 
-  // --- ゲームロジックフック ---
+  const roomRef = useRef(room);
+  const isMultiplayerRef = useRef(isMultiplayer);
+  const mySocketIdRef = useRef(mySocketId);
+  const selectedSkinIdRef = useRef(selectedSkinId);
+
+  useEffect(() => {
+    roomRef.current = room;
+    isMultiplayerRef.current = isMultiplayer;
+    mySocketIdRef.current = mySocketId;
+    selectedSkinIdRef.current = selectedSkinId;
+  });
+
   const {
     tiles,
     isSolved,
@@ -144,7 +148,6 @@ const App = () => {
     gridSize,
     isVoidMode,
     filterType,
-    // マルチプレイ時の進捗送信
     onMove: (progress, currentScore, currentMoves) => {
       if (isMultiplayer && room && socketRef.current) {
         socketRef.current.emit("update_progress", {
@@ -155,7 +158,6 @@ const App = () => {
         });
       }
     },
-    // クリア時の処理
     onSolve: (finalScore, finalTime) => {
       if (!isMultiplayer) {
         setShowSuccessDialog(true);
@@ -182,7 +184,6 @@ const App = () => {
     shuffleBoardRef.current = shuffleBoard;
   }, [shuffleBoard]);
 
-  // --- リセットと退出 ---
   const handleExit = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -207,14 +208,13 @@ const App = () => {
     [resetGame]
   );
 
-  // --- Socket.IO リスナー ---
   useEffect(() => {
     if (isMultiplayer) {
       if (!socketRef.current) {
         socketRef.current = io(SERVER_URL);
       }
       const socket = socketRef.current;
-      socket.off(); // 既存リスナー削除
+      socket.off();
 
       if (!socket.connected) socket.connect();
 
@@ -234,7 +234,6 @@ const App = () => {
       };
 
       socket.on("connect", () => {
-        console.log("Connected", socket.id);
         setMySocketId(socket.id || null);
         executePendingAction();
       });
@@ -371,7 +370,6 @@ const App = () => {
     }
   }, [isMultiplayer, handleExit, resetGameCallback, mySocketId]);
 
-  // --- 初期化 ---
   useEffect(() => {
     if (
       !initializedRef.current &&
@@ -382,10 +380,8 @@ const App = () => {
       setSelectedChampId("Ahri");
       initializedRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, champions]);
+  }, [loading, champions, selectedChampId]);
 
-  // --- ダークモード ---
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
@@ -397,15 +393,12 @@ const App = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // --- スキン取得ロジック (競合防止とローディング管理) ---
   useEffect(() => {
     if (!selectedChampId || !version) return;
 
-    let ignore = false; // 競合防止フラグ
+    let ignore = false;
 
     const fetchSkinData = async () => {
-      // ロード開始：既存のスキンリストを空にして、ローディング状態にする
-      setSkins([]);
       setIsSkinLoading(true);
 
       try {
@@ -416,21 +409,25 @@ const App = () => {
         const champDetails = data.data[selectedChampId];
         const newSkins = champDetails.skins;
 
-        // もしこのリクエストが終わる前にチャンピオンが変更されていたら何もしない
         if (ignore) return;
 
         setSkins(newSkins);
 
-        // スキンのデフォルト選択処理
+        const currentRoom = roomRef.current;
+        const currentIsMulti = isMultiplayerRef.current;
+        const currentSocket = mySocketIdRef.current;
+        const currentSkinId = selectedSkinIdRef.current;
+
         const isGuest =
-          isMultiplayer && room && !room.players[mySocketId || ""]?.isHost;
+          currentIsMulti &&
+          currentRoom &&
+          !currentRoom.players[currentSocket || ""]?.isHost;
 
         if (!isGuest && newSkins.length > 0) {
           const currentSkinExists = newSkins.some(
-            (s: Skin) => s.id === selectedSkinId
+            (s: Skin) => s.id === currentSkinId
           );
-          // 既存の選択がない、または新しいリストに含まれていない場合は先頭を選択
-          if (!currentSkinExists || !isMultiplayer) {
+          if (!currentSkinExists || !currentIsMulti) {
             setSelectedSkinId(newSkins[0].id);
           }
         }
@@ -445,20 +442,11 @@ const App = () => {
 
     fetchSkinData();
 
-    // クリーンアップ関数：チャンピオンIDが変わったら前のリクエスト結果を無視する
     return () => {
       ignore = true;
     };
-  }, [
-    selectedChampId,
-    version,
-    isMultiplayer,
-    room,
-    selectedSkinId,
-    mySocketId,
-  ]);
+  }, [selectedChampId, version]);
 
-  // --- ホスト設定同期 ---
   const currentRoomId = room?.id;
   const isCurrentHost = room?.players[mySocketId || ""]?.isHost;
 
@@ -483,17 +471,13 @@ const App = () => {
     isCurrentHost,
   ]);
 
-  // 初期化時のリセット
   useEffect(() => {
     resetGameCallback();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [resetGameCallback]);
 
-  // --- 画像URL管理 (チラつき防止) ---
   useEffect(() => {
     if (!selectedChampId || !selectedSkinId) return;
 
-    // スキンリストに存在する場合のみ更新（不整合時は前の画像を表示維持）
     const skin = skins.find((s) => s.id === selectedSkinId);
     if (!skin) {
       return;
@@ -503,7 +487,6 @@ const App = () => {
     setCurrentImageUrl(newUrl);
   }, [selectedChampId, selectedSkinId, skins]);
 
-  // --- 変数定義 ---
   const isHost = isMultiplayer
     ? room?.players[mySocketId || ""]?.isHost ?? false
     : true;
@@ -529,7 +512,6 @@ const App = () => {
     return !isSolved && finishedCount === playerCount - 1 && playerCount > 1;
   }, [isMultiplayer, room, multiplayerMode, isSolved, playerCount]);
 
-  // --- 最後の1人アラート表示 ---
   useEffect(() => {
     if (isTimeAttackLastOne && !hasShownLastOneAlertRef.current) {
       hasShownLastOneAlertRef.current = true;
@@ -543,8 +525,6 @@ const App = () => {
       });
     }
   }, [isTimeAttackLastOne]);
-
-  // --- ハンドラー群 ---
 
   const handleGridSizeChange = useCallback(
     (newSize: number) => {
@@ -904,7 +884,10 @@ const App = () => {
                       {canControlSettings ? (
                         <Select
                           value={selectedChampId}
-                          onValueChange={setSelectedChampId}
+                          onValueChange={(val) => {
+                            setSelectedChampId(val);
+                            setSelectedSkinId("");
+                          }}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="チャンピオンを選択" />
