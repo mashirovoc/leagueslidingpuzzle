@@ -73,7 +73,6 @@ import type {
   Skin,
 } from "@/lib/types";
 
-// Socket接続後のアクション待機用
 type PendingSocketAction =
   | { type: "create"; username: string }
   | { type: "join"; roomId: string; username: string };
@@ -82,7 +81,6 @@ const App = () => {
   const { version, champions, loading } = useLeagueData();
   const initializedRef = useRef(false);
 
-  // --- アプリケーション状態 ---
   const [appState, setAppState] = useState<AppState>("MENU");
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [username, setUsername] = useState("");
@@ -94,7 +92,6 @@ const App = () => {
     description: "",
   });
 
-  // --- Socket.IO 状態 ---
   const socketRef = useRef<Socket | null>(null);
   const [mySocketId, setMySocketId] = useState<string | null>(null);
 
@@ -103,7 +100,6 @@ const App = () => {
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [finishedPlayers, setFinishedPlayers] = useState<Player[]>([]);
 
-  // --- ゲーム設定状態 ---
   const [selectedChampId, setSelectedChampId] = useState<string>("");
   const [skins, setSkins] = useState<Skin[]>([]);
   const [selectedSkinId, setSelectedSkinId] = useState<string>("");
@@ -115,7 +111,6 @@ const App = () => {
   const [showExample, setShowExample] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
-  // --- ゲームロジックフック ---
   const {
     tiles,
     isSolved,
@@ -135,7 +130,6 @@ const App = () => {
     gridSize,
     isVoidMode,
     filterType,
-    // マルチプレイ時の進捗送信
     onMove: (progress, currentScore, currentMoves) => {
       if (isMultiplayer && room && socketRef.current) {
         socketRef.current.emit("update_progress", {
@@ -146,7 +140,6 @@ const App = () => {
         });
       }
     },
-    // クリア時の処理
     onSolve: (finalScore, finalTime) => {
       if (!isMultiplayer) {
         setShowSuccessDialog(true);
@@ -173,7 +166,6 @@ const App = () => {
     shuffleBoardRef.current = shuffleBoard;
   }, [shuffleBoard]);
 
-  // --- リセットと退出 ---
   const handleExit = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -197,14 +189,13 @@ const App = () => {
     [resetGame]
   );
 
-  // --- Socket.IO リスナー ---
   useEffect(() => {
     if (isMultiplayer) {
       if (!socketRef.current) {
         socketRef.current = io(SERVER_URL);
       }
       const socket = socketRef.current;
-      socket.off(); // 既存リスナー削除
+      socket.off();
 
       if (!socket.connected) socket.connect();
 
@@ -229,7 +220,6 @@ const App = () => {
         executePendingAction();
       });
 
-      // 【修正】すでに接続済みかつIDがStateに入っていない場合のみ更新する
       if (socket.connected && !mySocketId) {
         setMySocketId(socket.id || null);
         executePendingAction();
@@ -361,9 +351,7 @@ const App = () => {
     }
   }, [isMultiplayer, handleExit, resetGameCallback, mySocketId]);
 
-  // --- 初期化 ---
   useEffect(() => {
-    // 【修正】Strictな判定で不必要な更新を防ぐ
     if (
       !initializedRef.current &&
       !loading &&
@@ -374,9 +362,8 @@ const App = () => {
       initializedRef.current = true;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, champions]); // selectedChampIdを外してループ防止
+  }, [loading, champions]);
 
-  // --- ダークモード ---
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
@@ -388,7 +375,6 @@ const App = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // --- スキン取得 ---
   useEffect(() => {
     if (!selectedChampId || !version) return;
     const fetchSkinData = async () => {
@@ -425,7 +411,6 @@ const App = () => {
     mySocketId,
   ]);
 
-  // --- ホスト設定同期 ---
   const currentRoomId = room?.id;
   const isCurrentHost = room?.players[mySocketId || ""]?.isHost;
 
@@ -450,13 +435,10 @@ const App = () => {
     isCurrentHost,
   ]);
 
-  // 【修正】初期化時のリセット（マウント時のみ）
   useEffect(() => {
     resetGameCallback();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // --- ハンドラー群 ---
 
   const handleGridSizeChange = useCallback(
     (newSize: number) => {
@@ -609,7 +591,6 @@ const App = () => {
     mySocketId,
   ]);
 
-  // --- 変数定義 ---
   const isHost = isMultiplayer
     ? room?.players[mySocketId || ""]?.isHost ?? false
     : true;
