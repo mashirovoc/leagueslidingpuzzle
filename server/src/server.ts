@@ -18,13 +18,11 @@ const allowedOrigins = [
   "http://localhost:3001",
 ];
 
-// FastifyのCORS設定
 fastify.register(cors, {
   origin: allowedOrigins,
   methods: ["GET", "POST", "PUT", "DELETE"],
 });
 
-// Socket.IOのCORS設定
 fastify.register(fastifySocketIO, {
   cors: {
     origin: allowedOrigins,
