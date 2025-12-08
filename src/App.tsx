@@ -61,8 +61,6 @@ import { ResultDialog } from "@/components/game/ResultDialog";
 import PuzzleBoard from "@/components/puzzle/PuzzleBoard";
 import { useLeagueData } from "@/hooks/useLeagueData";
 import { usePuzzleGame } from "@/hooks/usePuzzleGame";
-import { DDRAGON_BASE, SERVER_URL } from "@/lib/constants";
-import { formatTime, getFilterStyle } from "@/lib/game-utils";
 import type {
   AlertState,
   AppState,
@@ -71,7 +69,9 @@ import type {
   Player,
   Room,
   Skin,
-} from "@/lib/types";
+} from "@/lib//types";
+import { DDRAGON_BASE, SERVER_URL } from "@/lib/constants";
+import { formatTime, getFilterStyle } from "@/lib/game-utils";
 
 // Socket接続後のアクション待機用
 type PendingSocketAction =
@@ -107,6 +107,10 @@ const App = () => {
   const [selectedChampId, setSelectedChampId] = useState<string>("");
   const [skins, setSkins] = useState<Skin[]>([]);
   const [selectedSkinId, setSelectedSkinId] = useState<string>("");
+
+  // 【修正点1】画像をState管理に変更
+  const [currentImageUrl, setCurrentImageUrl] = useState<string>("");
+
   const [gridSize, setGridSize] = useState(3);
   const [isVoidMode, setIsVoidMode] = useState(false);
   const [filterType, setFilterType] = useState<FilterType>("none");
@@ -459,20 +463,21 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- 【修正済み】getImageUrl (ID一致チェックを緩和) ---
-  const getImageUrl = useMemo(() => {
-    // チャンピオンかスキンが未選択なら空
-    if (!selectedChampId || !selectedSkinId) return "";
+  // --- 【修正点2】画像のURL管理 (useMemo -> useEffect) ---
+  // データが揃うまで画像のURLを更新しないことでチラつき（空画像）を防ぐ
+  useEffect(() => {
+    if (!selectedChampId || !selectedSkinId) return;
 
-    // スキンデータがロードされていない、あるいは
-    // 選択されたスキンIDが現在のスキンリストに存在しない場合は空
-    // (これがチラつきの原因: チャンピオン切り替え直後に古いスキンIDが残っている状態を防ぐ)
+    // 現在のスキンリストの中に、選択されたスキンIDが存在するか確認
+    // 存在しない場合（＝まだ新しいチャンピオンのデータ取得中）は更新しない
     const skin = skins.find((s) => s.id === selectedSkinId);
     if (!skin) {
-      return "";
+      return;
     }
 
-    return `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
+    // データが整合している場合のみURLを更新
+    const newUrl = `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
+    setCurrentImageUrl(newUrl);
   }, [selectedChampId, selectedSkinId, skins]);
 
   // --- 変数定義 ---
@@ -1085,7 +1090,8 @@ const App = () => {
                 <CardContent>
                   <div className="relative aspect-video w-full rounded-md overflow-hidden border">
                     <img
-                      src={getImageUrl}
+                      // 【修正点】useMemoではなくState管理されたURLを使用
+                      src={currentImageUrl}
                       className="object-cover w-full h-full"
                       style={{ filter: getFilterStyle(filterType) }}
                       alt="Preview"
@@ -1256,7 +1262,7 @@ const App = () => {
 
               {showExample && !isVoidMode && (
                 <div className="rounded-lg overflow-hidden border animate-in zoom-in-95 duration-200">
-                  <img src={getImageUrl} className="w-full" alt="お手本" />
+                  <img src={currentImageUrl} className="w-full" alt="お手本" />
                 </div>
               )}
 
@@ -1308,7 +1314,8 @@ const App = () => {
                 isSolved={isSolved}
                 isPlaying={isPlaying}
                 hintTileIndex={hintTileIndex}
-                imageUrl={getImageUrl}
+                // 【修正点】useMemoではなくState管理されたURLを使用
+                imageUrl={currentImageUrl}
                 filterType={filterType}
                 onTileClick={handleTileClick}
               />
