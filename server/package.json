@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/server.ts",
-    "build": "npm install && npm run buil",
+    "build": "npm install && npm run build",
     "start": "node dist/server.js"
   },
   "keywords": [],
