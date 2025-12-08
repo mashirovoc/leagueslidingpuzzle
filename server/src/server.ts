@@ -27,7 +27,7 @@ fastify.register(fastifySocketIO, {
   cors: {
     origin: allowedOrigins,
     methods: ["GET", "POST"],
-    credentials: true, // 必要に応じて
+    credentials: true,
   },
 });
 
