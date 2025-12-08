@@ -124,7 +124,7 @@ fastify.ready().then(() => {
           room.settings = { ...room.settings, ...data.settings };
         }
         if (data.championId) room.championId = data.championId;
-        if (data.skinId) room.skinId = data.skinId;
+        if (data.skinId !== undefined) room.skinId = data.skinId;
 
         Object.keys(room.players).forEach((pid) => {
           if (!room.players[pid].isHost) room.players[pid].isReady = false;
@@ -236,7 +236,6 @@ const start = async () => {
   try {
     const port = 3001;
     await fastify.listen({ port, host: "0.0.0.0" });
-    console.log(`Server running at http://localhost:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
