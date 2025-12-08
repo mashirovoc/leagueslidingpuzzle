@@ -61,6 +61,8 @@ import { ResultDialog } from "@/components/game/ResultDialog";
 import PuzzleBoard from "@/components/puzzle/PuzzleBoard";
 import { useLeagueData } from "@/hooks/useLeagueData";
 import { usePuzzleGame } from "@/hooks/usePuzzleGame";
+import { DDRAGON_BASE, SERVER_URL } from "@/lib/constants";
+import { formatTime, getFilterStyle } from "@/lib/game-utils";
 import type {
   AlertState,
   AppState,
@@ -69,9 +71,7 @@ import type {
   Player,
   Room,
   Skin,
-} from "@/lib//types";
-import { DDRAGON_BASE, SERVER_URL } from "@/lib/constants";
-import { formatTime, getFilterStyle } from "@/lib/game-utils";
+} from "@/lib/types";
 
 // Socket接続後のアクション待機用
 type PendingSocketAction =
@@ -106,9 +106,11 @@ const App = () => {
   // --- ゲーム設定状態 ---
   const [selectedChampId, setSelectedChampId] = useState<string>("");
   const [skins, setSkins] = useState<Skin[]>([]);
-  const [selectedSkinId, setSelectedSkinId] = useState<string>("");
+  // スキンのロード状態を管理（チラつき防止）
+  const [isSkinLoading, setIsSkinLoading] = useState(false);
 
-  // 【修正点1】画像をState管理に変更
+  const [selectedSkinId, setSelectedSkinId] = useState<string>("");
+  // 画像URLをState管理（チラつき防止）
   const [currentImageUrl, setCurrentImageUrl] = useState<string>("");
 
   const [gridSize, setGridSize] = useState(3);
@@ -395,10 +397,17 @@ const App = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // --- スキン取得 ---
+  // --- スキン取得ロジック (競合防止とローディング管理) ---
   useEffect(() => {
     if (!selectedChampId || !version) return;
+
+    let ignore = false; // 競合防止フラグ
+
     const fetchSkinData = async () => {
+      // ロード開始：既存のスキンリストを空にして、ローディング状態にする
+      setSkins([]);
+      setIsSkinLoading(true);
+
       try {
         const res = await fetch(
           `${DDRAGON_BASE}/cdn/${version}/data/ja_JP/champion/${selectedChampId}.json`
@@ -406,23 +415,40 @@ const App = () => {
         const data = await res.json();
         const champDetails = data.data[selectedChampId];
         const newSkins = champDetails.skins;
+
+        // もしこのリクエストが終わる前にチャンピオンが変更されていたら何もしない
+        if (ignore) return;
+
         setSkins(newSkins);
 
+        // スキンのデフォルト選択処理
         const isGuest =
           isMultiplayer && room && !room.players[mySocketId || ""]?.isHost;
+
         if (!isGuest && newSkins.length > 0) {
           const currentSkinExists = newSkins.some(
             (s: Skin) => s.id === selectedSkinId
           );
+          // 既存の選択がない、または新しいリストに含まれていない場合は先頭を選択
           if (!currentSkinExists || !isMultiplayer) {
             setSelectedSkinId(newSkins[0].id);
           }
         }
       } catch (e) {
         console.error(e);
+      } finally {
+        if (!ignore) {
+          setIsSkinLoading(false);
+        }
       }
     };
+
     fetchSkinData();
+
+    // クリーンアップ関数：チャンピオンIDが変わったら前のリクエスト結果を無視する
+    return () => {
+      ignore = true;
+    };
   }, [
     selectedChampId,
     version,
@@ -463,19 +489,16 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // --- 【修正点2】画像のURL管理 (useMemo -> useEffect) ---
-  // データが揃うまで画像のURLを更新しないことでチラつき（空画像）を防ぐ
+  // --- 画像URL管理 (チラつき防止) ---
   useEffect(() => {
     if (!selectedChampId || !selectedSkinId) return;
 
-    // 現在のスキンリストの中に、選択されたスキンIDが存在するか確認
-    // 存在しない場合（＝まだ新しいチャンピオンのデータ取得中）は更新しない
+    // スキンリストに存在する場合のみ更新（不整合時は前の画像を表示維持）
     const skin = skins.find((s) => s.id === selectedSkinId);
     if (!skin) {
       return;
     }
 
-    // データが整合している場合のみURLを更新
     const newUrl = `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
     setCurrentImageUrl(newUrl);
   }, [selectedChampId, selectedSkinId, skins]);
@@ -908,9 +931,14 @@ const App = () => {
                         <Select
                           value={selectedSkinId}
                           onValueChange={setSelectedSkinId}
+                          disabled={!canControlSettings || isSkinLoading}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="スキンを選択" />
+                            <SelectValue
+                              placeholder={
+                                isSkinLoading ? "読み込み中..." : "スキンを選択"
+                              }
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {skins.map((s) => (
@@ -922,8 +950,10 @@ const App = () => {
                         </Select>
                       ) : (
                         <div className="text-sm font-medium">
-                          {skins.find((s) => s.id === selectedSkinId)?.name ||
-                            "Default"}
+                          {isSkinLoading
+                            ? "読み込み中..."
+                            : skins.find((s) => s.id === selectedSkinId)
+                                ?.name || "Default"}
                         </div>
                       )}
                     </div>
@@ -1090,7 +1120,6 @@ const App = () => {
                 <CardContent>
                   <div className="relative aspect-video w-full rounded-md overflow-hidden border">
                     <img
-                      // 【修正点】useMemoではなくState管理されたURLを使用
                       src={currentImageUrl}
                       className="object-cover w-full h-full"
                       style={{ filter: getFilterStyle(filterType) }}
@@ -1314,7 +1343,6 @@ const App = () => {
                 isSolved={isSolved}
                 isPlaying={isPlaying}
                 hintTileIndex={hintTileIndex}
-                // 【修正点】useMemoではなくState管理されたURLを使用
                 imageUrl={currentImageUrl}
                 filterType={filterType}
                 onTileClick={handleTileClick}
