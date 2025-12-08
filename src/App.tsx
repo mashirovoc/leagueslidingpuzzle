@@ -73,6 +73,7 @@ import type {
   Skin,
 } from "@/lib/types";
 
+// Socket接続後のアクション待機用
 type PendingSocketAction =
   | { type: "create"; username: string }
   | { type: "join"; roomId: string; username: string };
@@ -81,6 +82,7 @@ const App = () => {
   const { version, champions, loading } = useLeagueData();
   const initializedRef = useRef(false);
 
+  // --- アプリケーション状態 ---
   const [appState, setAppState] = useState<AppState>("MENU");
   const [isMultiplayer, setIsMultiplayer] = useState(false);
   const [username, setUsername] = useState("");
@@ -92,6 +94,7 @@ const App = () => {
     description: "",
   });
 
+  // --- Socket.IO 状態 ---
   const socketRef = useRef<Socket | null>(null);
   const [mySocketId, setMySocketId] = useState<string | null>(null);
 
@@ -100,6 +103,7 @@ const App = () => {
   const [winnerId, setWinnerId] = useState<string | null>(null);
   const [finishedPlayers, setFinishedPlayers] = useState<Player[]>([]);
 
+  // --- ゲーム設定状態 ---
   const [selectedChampId, setSelectedChampId] = useState<string>("");
   const [skins, setSkins] = useState<Skin[]>([]);
   const [selectedSkinId, setSelectedSkinId] = useState<string>("");
@@ -111,8 +115,10 @@ const App = () => {
   const [showExample, setShowExample] = useState(false);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
+  // --- アラート制御用Ref ---
   const hasShownLastOneAlertRef = useRef(false);
 
+  // --- ゲームロジックフック ---
   const {
     tiles,
     isSolved,
@@ -132,6 +138,7 @@ const App = () => {
     gridSize,
     isVoidMode,
     filterType,
+    // マルチプレイ時の進捗送信
     onMove: (progress, currentScore, currentMoves) => {
       if (isMultiplayer && room && socketRef.current) {
         socketRef.current.emit("update_progress", {
@@ -142,6 +149,7 @@ const App = () => {
         });
       }
     },
+    // クリア時の処理
     onSolve: (finalScore, finalTime) => {
       if (!isMultiplayer) {
         setShowSuccessDialog(true);
@@ -168,6 +176,7 @@ const App = () => {
     shuffleBoardRef.current = shuffleBoard;
   }, [shuffleBoard]);
 
+  // --- リセットと退出 ---
   const handleExit = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.disconnect();
@@ -192,13 +201,14 @@ const App = () => {
     [resetGame]
   );
 
+  // --- Socket.IO リスナー ---
   useEffect(() => {
     if (isMultiplayer) {
       if (!socketRef.current) {
         socketRef.current = io(SERVER_URL);
       }
       const socket = socketRef.current;
-      socket.off();
+      socket.off(); // 既存リスナー削除
 
       if (!socket.connected) socket.connect();
 
@@ -355,6 +365,7 @@ const App = () => {
     }
   }, [isMultiplayer, handleExit, resetGameCallback, mySocketId]);
 
+  // --- 初期化 ---
   useEffect(() => {
     if (
       !initializedRef.current &&
@@ -368,6 +379,7 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, champions]);
 
+  // --- ダークモード ---
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
@@ -379,6 +391,7 @@ const App = () => {
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
+  // --- スキン取得 ---
   useEffect(() => {
     if (!selectedChampId || !version) return;
     const fetchSkinData = async () => {
@@ -415,6 +428,7 @@ const App = () => {
     mySocketId,
   ]);
 
+  // --- ホスト設定同期 ---
   const currentRoomId = room?.id;
   const isCurrentHost = room?.players[mySocketId || ""]?.isHost;
 
@@ -439,23 +453,29 @@ const App = () => {
     isCurrentHost,
   ]);
 
+  // 初期化時のリセット
   useEffect(() => {
     resetGameCallback();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // --- 【修正済み】getImageUrl (ID一致チェックを緩和) ---
   const getImageUrl = useMemo(() => {
+    // チャンピオンかスキンが未選択なら空
     if (!selectedChampId || !selectedSkinId) return "";
 
+    // スキンデータがロードされていない、あるいは
+    // 選択されたスキンIDが現在のスキンリストに存在しない場合は空
+    // (これがチラつきの原因: チャンピオン切り替え直後に古いスキンIDが残っている状態を防ぐ)
     const skin = skins.find((s) => s.id === selectedSkinId);
-
-    if (!skin || !selectedSkinId.startsWith(selectedChampId)) {
+    if (!skin) {
       return "";
     }
 
     return `${DDRAGON_BASE}/cdn/img/champion/splash/${selectedChampId}_${skin.num}.jpg`;
   }, [selectedChampId, selectedSkinId, skins]);
 
+  // --- 変数定義 ---
   const isHost = isMultiplayer
     ? room?.players[mySocketId || ""]?.isHost ?? false
     : true;
@@ -481,6 +501,7 @@ const App = () => {
     return !isSolved && finishedCount === playerCount - 1 && playerCount > 1;
   }, [isMultiplayer, room, multiplayerMode, isSolved, playerCount]);
 
+  // --- 最後の1人アラート表示 ---
   useEffect(() => {
     if (isTimeAttackLastOne && !hasShownLastOneAlertRef.current) {
       hasShownLastOneAlertRef.current = true;
@@ -494,6 +515,8 @@ const App = () => {
       });
     }
   }, [isTimeAttackLastOne]);
+
+  // --- ハンドラー群 ---
 
   const handleGridSizeChange = useCallback(
     (newSize: number) => {
