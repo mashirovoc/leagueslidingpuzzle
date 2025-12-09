@@ -1035,7 +1035,7 @@ const App = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2 pb-4 border-b">
+                      <div className="space-y-2 pb-4">
                         <Label>勝負形式</Label>
                         {canControlSettings ? (
                           <Select
