@@ -31,41 +31,75 @@ fastify.register(fastifySocketIO, {
   },
 });
 
-const rooms: { [roomId: string]: Room } = {};
+interface ExtendedRoom extends Room {
+  isPrivate: boolean;
+}
+
+const rooms: { [roomId: string]: ExtendedRoom } = {};
+
+const getPublicRooms = () => {
+  return Object.values(rooms)
+    .filter((r) => !r.isPrivate && r.status === "LOBBY")
+    .map((r) => {
+      const hostPlayer = Object.values(r.players).find((p) => p.isHost);
+      return {
+        id: r.id,
+        hostName: hostPlayer?.name || "Unknown",
+        playerCount: Object.keys(r.players).length,
+        mode: r.settings.mode,
+        gridSize: r.settings.gridSize,
+      };
+    });
+};
+
+const broadcastRoomList = (io: Server) => {
+  io.emit("room_list_update", getPublicRooms());
+};
 
 fastify.ready().then(() => {
   fastify.io.on("connection", (socket: Socket) => {
     console.log("User connected:", socket.id);
 
-    socket.on("create_room", (data: { username?: string }) => {
-      const roomId = uuidv4().substring(0, 6).toUpperCase();
-      rooms[roomId] = {
-        id: roomId,
-        players: {
-          [socket.id]: {
-            socketId: socket.id,
-            isHost: true,
-            name: data.username || "Host",
-            isReady: false,
-            progress: 0,
-            score: 0,
-            finished: false,
-          },
-        },
-        settings: {
-          gridSize: 3,
-          mode: "TIME_ATTACK",
-          isVoidMode: false,
-          filterType: "none",
-        },
-        status: "LOBBY",
-        championId: "Ahri",
-        skinId: "",
-        seed: Math.random(),
-      };
-      socket.join(roomId);
-      socket.emit("room_created", { roomId, room: rooms[roomId] });
+    socket.emit("room_list_update", getPublicRooms());
+
+    socket.on("request_rooms", () => {
+      socket.emit("room_list_update", getPublicRooms());
     });
+
+    socket.on(
+      "create_room",
+      (data: { username?: string; isPrivate?: boolean }) => {
+        const roomId = uuidv4().substring(0, 6).toUpperCase();
+        rooms[roomId] = {
+          id: roomId,
+          isPrivate: !!data.isPrivate,
+          players: {
+            [socket.id]: {
+              socketId: socket.id,
+              isHost: true,
+              name: data.username || "Host",
+              isReady: false,
+              progress: 0,
+              score: 0,
+              finished: false,
+            },
+          },
+          settings: {
+            gridSize: 3,
+            mode: "TIME_ATTACK",
+            isVoidMode: false,
+            filterType: "none",
+          },
+          status: "LOBBY",
+          championId: "Ahri",
+          skinId: "",
+          seed: Math.random(),
+        };
+        socket.join(roomId);
+        socket.emit("room_created", { roomId, room: rooms[roomId] });
+        broadcastRoomList(fastify.io);
+      }
+    );
 
     socket.on("join_room", (data: { roomId: string; username?: string }) => {
       const { roomId, username } = data;
@@ -97,6 +131,7 @@ fastify.ready().then(() => {
       socket.join(roomId);
       fastify.io.to(roomId).emit("room_update", room);
       socket.emit("joined_room", { room });
+      broadcastRoomList(fastify.io);
     });
 
     socket.on("toggle_ready", (data: { roomId: string }) => {
@@ -132,6 +167,9 @@ fastify.ready().then(() => {
 
         room.seed = Math.random();
         fastify.io.to(data.roomId).emit("room_update", room);
+
+        // 設定変更時に一覧も更新（グリッドサイズなどが変わるため）
+        broadcastRoomList(fastify.io);
       }
     );
 
@@ -157,6 +195,7 @@ fastify.ready().then(() => {
       });
 
       fastify.io.to(data.roomId).emit("game_started", room);
+      broadcastRoomList(fastify.io); // ゲーム開始で一覧から消す
     });
 
     socket.on(
@@ -216,6 +255,8 @@ fastify.ready().then(() => {
 
     socket.on("disconnect", () => {
       console.log("User disconnected:", socket.id);
+      let needsBroadcast = false;
+
       for (const roomId in rooms) {
         const room = rooms[roomId];
         if (room.players[socket.id]) {
@@ -223,11 +264,16 @@ fastify.ready().then(() => {
 
           if (Object.keys(room.players).length === 0) {
             delete rooms[roomId];
+            needsBroadcast = true;
           } else {
             fastify.io.to(roomId).emit("player_left", { socketId: socket.id });
+            // ホストが落ちた場合などの処理はクライアント側任せだが、人数変化は通知
+            if (room.status === "LOBBY") needsBroadcast = true;
           }
         }
       }
+
+      if (needsBroadcast) broadcastRoomList(fastify.io);
     });
   });
 });
@@ -236,6 +282,7 @@ const start = async () => {
   try {
     const port = 3001;
     await fastify.listen({ port, host: "0.0.0.0" });
+    console.log(`Server running at http://localhost:${port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
