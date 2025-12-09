@@ -687,7 +687,7 @@ const App = () => {
       )}
     >
       <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex flex-col md:flex-row justify-between items-center relative">
+        <div className="flex flex-col md:flex-row justify-between items-center relative gap-4">
           <div className="space-y-1 text-center md:text-left">
             <h1 className="text-3xl font-bold tracking-tight text-foreground transition-colors void:text-primary">
               League Sliding Puzzle
@@ -714,7 +714,7 @@ const App = () => {
               variant="ghost"
               size="sm"
               onClick={handleExit}
-              className="absolute right-0 top-0 md:relative text-destructive hover:bg-destructive/10"
+              className="text-destructive hover:bg-destructive/10 md:ml-auto"
             >
               <LogOut className="w-4 h-4 mr-2" /> トップへ戻る
             </Button>
@@ -846,7 +846,7 @@ const App = () => {
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2 pb-4">
+                      <div className="space-y-2 pb-4 border-b">
                         <Label>勝負形式</Label>
                         {canControlSettings ? (
                           <Select
@@ -950,7 +950,6 @@ const App = () => {
                       <Select
                         value={filterType}
                         onValueChange={(v) => setFilterType(v as FilterType)}
-                        disabled={isVoidMode}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -1132,7 +1131,7 @@ const App = () => {
                           <div className="flex items-center gap-2">
                             {player.isHost && (
                               <Badge variant="default" className="text-[10px]">
-                                ホスト
+                                HOST
                               </Badge>
                             )}
                             <span className="font-medium truncate max-w-[120px]">
@@ -1147,9 +1146,9 @@ const App = () => {
                           <div>
                             {!player.isHost &&
                               (player.isReady ? (
-                                <Badge className="bg-green-500">Ready</Badge>
+                                <Badge className="bg-green-500">READY</Badge>
                               ) : (
-                                <Badge variant="outline">準備中</Badge>
+                                <Badge variant="outline">WAITING</Badge>
                               ))}
                           </div>
                         </div>
