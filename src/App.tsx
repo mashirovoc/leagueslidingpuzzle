@@ -100,6 +100,10 @@ interface GameOverData {
   winnerId: string;
 }
 
+type PendingUiAction =
+  | { type: "CREATE"; isPrivate: boolean }
+  | { type: "JOIN"; roomId: string };
+
 const App = () => {
   const { version, champions, loading } = useLeagueData();
   const initializedRef = useRef(false);
@@ -107,9 +111,11 @@ const App = () => {
   const [appState, setAppState] = useState<AppState>("MENU");
   const [isMultiplayer, setIsMultiplayer] = useState(false);
 
-  const [username, setUsername] = useState("Player");
+  const [username, setUsername] = useState("Guest");
   const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
   const [tempName, setTempName] = useState("");
+  const [pendingUiAction, setPendingUiAction] =
+    useState<PendingUiAction | null>(null);
 
   const [roomIdInput, setRoomIdInput] = useState("");
   const [isPrivateRoom, setIsPrivateRoom] = useState(false);
@@ -594,19 +600,31 @@ const App = () => {
     [resetGame, isMultiplayer, setIsAssistMode]
   );
 
-  const openNameDialog = () => {
-    setTempName(username === "Guest" ? "" : username);
+  const executeCreateRoom = (isPrivate: boolean) => {
+    if (!socketRef.current) return;
+    setIsMultiplayer(true);
+    socketRef.current.emit("create_room", {
+      username: username,
+      isPrivate: isPrivate,
+    });
+  };
+
+  const executeJoinRoom = (roomId: string) => {
+    if (!socketRef.current) return;
+    setIsMultiplayer(true);
+    socketRef.current.emit("join_room", {
+      roomId: roomId,
+      username: username,
+    });
+  };
+
+  const initiateActionWithDialog = (action: PendingUiAction) => {
+    setPendingUiAction(action);
+    setTempName("");
     setIsNameDialogOpen(true);
   };
 
-  const saveName = () => {
-    if (tempName.trim()) {
-      setUsername(tempName.trim());
-      setIsNameDialogOpen(false);
-    }
-  };
-
-  const handleCreateRoom = () => {
+  const initiateCreateRoom = () => {
     if (!isConnected || !socketRef.current) {
       setAlertState({
         open: true,
@@ -616,19 +634,15 @@ const App = () => {
       });
       return;
     }
-    if (username === "Guest" || !username) {
-      openNameDialog();
-      return;
-    }
 
-    setIsMultiplayer(true);
-    socketRef.current.emit("create_room", {
-      username: username,
-      isPrivate: isPrivateRoom,
-    });
+    if (username === "Guest") {
+      initiateActionWithDialog({ type: "CREATE", isPrivate: isPrivateRoom });
+    } else {
+      executeCreateRoom(isPrivateRoom);
+    }
   };
 
-  const handleJoinRoom = (targetRoomId?: string) => {
+  const initiateJoinRoom = (targetRoomId?: string) => {
     const idToJoin = targetRoomId || roomIdInput.toUpperCase();
     if (!idToJoin) return;
 
@@ -642,16 +656,36 @@ const App = () => {
       return;
     }
 
-    if (username === "Guest" || !username) {
-      openNameDialog();
-      return;
+    if (username === "Guest") {
+      initiateActionWithDialog({ type: "JOIN", roomId: idToJoin });
+    } else {
+      executeJoinRoom(idToJoin);
     }
+  };
 
-    setIsMultiplayer(true);
-    socketRef.current.emit("join_room", {
-      roomId: idToJoin,
-      username: username,
-    });
+  const saveName = () => {
+    if (tempName.trim()) {
+      const newName = tempName.trim();
+      setUsername(newName);
+      setIsNameDialogOpen(false);
+
+      if (pendingUiAction) {
+        if (pendingUiAction.type === "CREATE") {
+          setIsMultiplayer(true);
+          socketRef.current?.emit("create_room", {
+            username: newName,
+            isPrivate: pendingUiAction.isPrivate,
+          });
+        } else if (pendingUiAction.type === "JOIN") {
+          setIsMultiplayer(true);
+          socketRef.current?.emit("join_room", {
+            roomId: pendingUiAction.roomId,
+            username: newName,
+          });
+        }
+        setPendingUiAction(null);
+      }
+    }
   };
 
   const handleToggleReady = () => {
@@ -778,15 +812,6 @@ const App = () => {
             </p>
           </div>
           <div className="flex gap-2 items-center md:ml-auto">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={openNameDialog}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <User className="w-4 h-4 mr-2" />
-              {username}
-            </Button>
             {appState !== "MENU" && (
               <Button
                 variant="ghost"
@@ -838,18 +863,6 @@ const App = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-2 bg-muted rounded text-sm">
-                    <span className="text-muted-foreground">
-                      プレイヤー名:{" "}
-                      <span className="font-semibold text-foreground">
-                        {username}
-                      </span>
-                    </span>
-                    <Button variant="outline" onClick={openNameDialog}>
-                      変更
-                    </Button>
-                  </div>
-
                   <Tabs defaultValue="create" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="create">部屋を作成</TabsTrigger>
@@ -860,9 +873,9 @@ const App = () => {
                         <div className="space-y-0.5">
                           <Label className="text-base flex items-center gap-2">
                             {isPrivateRoom ? (
-                              <Lock className="w-4 h-4 text-primary" />
+                              <Lock className="w-4 h-4 text-orange-500" />
                             ) : (
-                              <Unlock className="w-4 h-4 text-muted-foreground" />
+                              <Unlock className="w-4 h-4 text-green-500" />
                             )}
                             非公開ルーム
                           </Label>
@@ -879,7 +892,7 @@ const App = () => {
                       </div>
                       <Button
                         className="w-full"
-                        onClick={handleCreateRoom}
+                        onClick={initiateCreateRoom}
                         disabled={!isConnected}
                       >
                         部屋を作成する
@@ -895,7 +908,7 @@ const App = () => {
                           className="uppercase font-mono"
                         />
                         <Button
-                          onClick={() => handleJoinRoom()}
+                          onClick={() => initiateJoinRoom()}
                           disabled={!isConnected}
                         >
                           参加
@@ -930,7 +943,7 @@ const App = () => {
                         <div
                           key={room.id}
                           className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer group"
-                          onClick={() => handleJoinRoom(room.id)}
+                          onClick={() => initiateJoinRoom(room.id)}
                         >
                           <div className="flex items-center gap-4">
                             <Badge variant="outline" className="font-mono">
